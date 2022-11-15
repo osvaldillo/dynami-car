@@ -1,8 +1,6 @@
 #ifndef _puenteH_H
 #define _puenteH_H
-
 #include <Arduino.h>
-
 class puenteH{
   private:
   int mot1d; //motor frontal derecho- avance hacia el frente
@@ -18,12 +16,16 @@ class puenteH{
   int mot4i; //motor trasero izquierdo- avance hacia atrás
   
   int velocidad; //velocidad en pwm
+  
   float mt1;
   float mt2;
   float mt3;
   float mt4;
+
   public:
+  
   puenteH(int mot1d,int mot1i,int mot2d,int mot2i,int mot3d,int mot3i,int mot4d,int mot4i,float mt1,float mt2,float mt3,float mt4);
+    
   void avanzar(int velocidad);
   void retroceder(int velocidad);
   void derecha(int velocidad);
