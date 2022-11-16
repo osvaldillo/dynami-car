@@ -16,72 +16,151 @@ CSN  10  //Pueden variar previo declaracion       CSN  10  //Pueden variar previ
 #include <nRF24L01.h> //Se incluye libreria 
 #include <RF24.h>     //Se incluye libreria
 
-#define boton1 4     //Declaramos que la variable botón esté vinculada con el pin A0
-#define boton2 5     //Declaramos que la variable botón esté vinculada con el pin A1
-#define boton3 6     //Declaramos que la variable botón esté vinculada con el pin A4
-#define boton4 7     //Declaramos que la variable botón esté vinculada con el pin A5
-#define boton5 8     //Declaramos que la variable botón esté vinculada con el pin A3
+#define LEDrojo A0  //Declaramos que la variable LED1 esté vinculada con el pin A0
+#define LEDazul A1  //Declaramos que la variable LED2 esté vinculada con el pin A1
+#define LEDconectividad A2  //Declaramos que la variable LED3 esté vinculada con el pin A2
 
-int Estado[0];
-int Estado1 = 0;      //Creamos una variable que tendra un valor de 0
-int Estado2 = 0;      //Creamos una variable que tendrá un valor de 0
-int Estado3 = 0;      //Creamos una variable que tendrá un valor de 0
-int Estado4 = 0;      //Creamos una variable que tendrá un valor de 0
-int Estado5 = 0;      //Creamos una variable que tendrá un valor de 0
+// Pines del Driver L298N
+#define MotordelanteroA 5     //in3
+#define MotordelanteroB 7    //in4
+#define MotordeposteriorA 2   //in1
+#define MotordeposteriorB 4   //in2
 
-bool ok;
+int enA = 3;
+int enB = 6;
 
-RF24 radio(9, 10);    // CE, CSN
+int Estado = 0; //Creamos una variable que tendra un valor de 0
 
-const byte Direccion[6] = "00002"; // Canal 2 si no sirve cambiar combinación de 5# ó #No
+int pwm = 200;
+
+RF24 radio(9, 10); // CE, CSN
+
+const byte Direccion[6] = "00002"; // Canal 2
 
 void setup() {
+  Serial.begin(9600);                    //Inicializa el monitor serial
+  radio.begin();                        //Inicia radio freceuncia
+  radio.openReadingPipe(1, Direccion); //Inicializa el objeto de radio previamente configurado "Dirección"
+  radio.setPALevel(RF24_PA_MIN);      //Establecemos el nivel del amplificador de potencia, en este caso Minimo
+  radio.startListening();            //radio.startListening() que configura el módulo como receptor.
+                                    //radio.stopListening() que configura el módulo como transmisor.
+                           
+  pinMode(LEDrojo, OUTPUT);           // Declaramos como salida
+  pinMode(LEDazul, OUTPUT);           // Declaramos como salida
+  pinMode(LEDconectividad, OUTPUT);   // Declaramos como salida
+  pinMode(MotordeposteriorA,OUTPUT);  // Declaramos como salida
+  pinMode(MotordeposteriorB,OUTPUT);  // Declaramos como salida
+  pinMode(MotordelanteroA,OUTPUT);    // Declaramos como salida
+  pinMode(MotordelanteroB,OUTPUT);    // Declaramos como salida
   
-  Serial.begin(9600);  //Inicializa el monitor serial
-  radio.begin();       //Inicializa el NRF24L01
-  radio.openWritingPipe(Direccion); ////Abrimos un canal de escritura
-  radio.setPALevel(RF24_PA_MIN);    //Establecemos el nivel del amplificador de potencia, en este caso Minimo
-  radio.stopListening();            //radio.stopListening() que configura el módulo como transmisor
-                                    //radio.startListening() que configura el módulo como receptor
-
-  
-  pinMode(boton1,INPUT);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-  pinMode(boton2,INPUT);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-  pinMode(boton3,INPUT);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-  pinMode(boton4,INPUT);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-  pinMode(boton5,INPUT);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
 
 }
-void loop() { //Inicia El blucle infinito "Lo que se encuentre en ese blucle se repetira infinitamente"
-
-  Estado1 = digitalRead(boton1); //Indicamos que la variable "Estado1"Sea igual a la lectura del "boton1"
-  Estado2 = digitalRead(boton2); //Indicamos que la variable "Estado2"Sea igual a la lectura del "boton2"
-  Estado3 = digitalRead(boton3); //Indicamos que la variable "Estado3"Sea igual a la lectura del "boton3"
-  Estado4 = digitalRead(boton4); //Indicamos que la variable "Estado4"Sea igual a la lectura del "boton4"
-  Estado5 = digitalRead(boton5); //Indicamos que la variable "Estado5"Sea igual a la lectura del "boton5"
-  
-  if (Estado1 == HIGH){       //Si el pulso es alto "HIGH" o 1 se envía
-    Estado[0] = 1;              //un 1
+void loop() { //Inicia El blucle infinito "Lo que se encuentre en ese bucle se repetira infinitamente"
+  analogWrite(enA, pwm);
+  analogWrite(enB, pwm);
+  /*if (!radio.available()){ //Si radio no esta disponible 
+    digitalWrite(LEDconectividad, LOW); // apagar led
   }
-
-  else if (Estado2 == HIGH){       //Si el pulso es alto "HIGH" o 1 se envía
-    Estado[0] = 0;              //un 3
-  }
-  
-  else if (Estado3 == HIGH){       //Si el pulso es alto "HIGH" o 1 se envía
-    Estado[0] = 2;              //un 4
-  } 
-  
-  else if (Estado4 == HIGH){     //Si el pulso es alto "HIGH" o 1 se envía
-    Estado[0] = 3;              //un 6
-  }
-  else{
-    Estado[0] = 99;
+  else{                          //si no
+      digitalWrite(LEDconectividad, HIGH); //encender led
+  }*/
+  Serial.println(radio.available());
+  while (radio.available()){   //Si radio esta disponible 
+    radio.read(&Estado, sizeof(Estado)); //leer datos y almacenarlos en estado
+    Serial.println(Estado); //imprimir en el monitor serial la variable EStado
+    switch(Estado){
+      case 0: retroceder();
+      case 1: avanzar();
+      case 2: giroIzquierda();
+      case 3: giroDerecha();
+    }
+    /*if (Estado == 1) {       //Sí, ingresa el número 1
+      digitalWrite(LEDrojo, LOW); // se manda un pulso bajo "LOW" "Led Apagado"
+      
+    }
     
+    else  if (Estado == 0) { //Sí, ingresa el número 0
+      digitalWrite(LEDrojo, LOW); // se manda un pulso bajo "LOW" "Led Apagado"
+      
+    }
+    
+    else if (Estado == 3) { //Sí, ingresa el número 3 
+      digitalWrite(LEDazul, LOW); // se manda un pulso bajo "LOW" "Led Apagado"
+      digitalWrite(LEDrojo, LOW); // se manda un pulso bajo "LOW" "Led Apagado"
+      
+    }
+    
+    else  if (Estado == 2) { //Sí, ingresa el número 2 
+      digitalWrite(LEDazul, HIGH); // se manda un pulso alto "HIGH" "Led Encendido"
+      digitalWrite(LEDrojo, LOW); // se manda un pulso bajo "LOW" "Led Apagado"
+      
+      }*/
   }
-  ok = radio.write(Estado, sizeof(Estado));
-  Serial.print(ok);
-  Serial.print("\t");
-  Serial.println(Estado[0]);
-  delay(250);
+  detenerse();
+  /*
+  //Alto
+  else if (Estado == 4) {  //Sí, ingresa el número 4 
+  digitalWrite(MotordelanteroA,LOW);  // se manda un pulso bajo "LOW" al MotordelanteroA "Apagado"
+  }
+  //Izquierda
+  else  if (Estado == 5) { //Sí, ingresa el número 5 
+  digitalWrite(MotordelanteroA,HIGH); // se manda un pulso bajo "LOW" al MotordelanteroA "Encendido"
+  digitalWrite(MotordelanteroB,LOW);  // se manda un pulso alto "HIGH" al MotordelanteroB "Apagado"
+  }
+  //Alto
+  else if (Estado == 6) { //Sí, ingresa el número 6 
+  digitalWrite(MotordelanteroB,LOW); // se manda un pulso bajo "HIGH" al MotordelanteroB "Apagado"
+
+  }
+  //Derecha
+  else  if (Estado == 7) { //Sí, ingresa el número 7 
+  digitalWrite(MotordelanteroA,LOW);  // se manda un pulso bajo "LOW" al MotordelanteroA "Apagado"
+  digitalWrite(MotordelanteroB,HIGH); // se manda un pulso alto "HIGH" al MotordelanteroB "Encendido"
+  }
+  //Giro de 360° no se si funcione checar
+  else  if (Estado == 9) { //Sí, ingresa el número 9 
+  digitalWrite(MotordelanteroA,LOW);  // se manda un pulso bajo "LOW" al MotordelanteroA "Apagado"
+  digitalWrite(MotordelanteroB,HIGH); // se manda un pulso alto "HIGH" al MotordelanteroB "Encendido"
+  digitalWrite(LEDazul, HIGH);        // se manda un pulso alto "HIGH" "Led Encendido"
+  digitalWrite(MotordeposteriorA,HIGH); // se manda un pulso alto "HIGH" al MotordeposteriorA "Encendido"
+  digitalWrite(MotordeposteriorB,LOW); //se manda un pulso bajo "LOW" al MotordeposteriorB "Apagado"
+  delay(5000); 
+  }
+  */
+}
+
+void avanzar(){
+  digitalWrite(MotordeposteriorA,HIGH);
+  digitalWrite(MotordeposteriorB,LOW);
+  digitalWrite(MotordelanteroA,HIGH);
+  digitalWrite(MotordelanteroB,LOW);
+}
+
+void retroceder(){
+  digitalWrite(MotordeposteriorA,HIGH);
+  digitalWrite(MotordeposteriorB,LOW);
+  digitalWrite(MotordelanteroA,LOW);
+  digitalWrite(MotordelanteroB,HIGH);  
+}
+
+void giroDerecha(){
+  digitalWrite(MotordeposteriorA,LOW);
+  digitalWrite(MotordeposteriorB,HIGH);
+  digitalWrite(MotordelanteroA,HIGH);
+  digitalWrite(MotordelanteroB,LOW);
+}
+
+void giroIzquierda(){
+  digitalWrite(MotordeposteriorA,LOW);
+  digitalWrite(MotordeposteriorB,HIGH);
+  digitalWrite(MotordelanteroA,LOW);
+  digitalWrite(MotordelanteroB,HIGH);  
+}
+
+void detenerse(){
+  digitalWrite(MotordeposteriorA,LOW);
+  digitalWrite(MotordeposteriorB,LOW);
+  digitalWrite(MotordelanteroA,LOW);
+  digitalWrite(MotordelanteroB,LOW);
+    
 }
