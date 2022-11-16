@@ -1,108 +1,156 @@
-//Pines para Arduno Nano, Uno, Pro mini             Pines para Arduino Mega.
-//SCK  13  //pin 13                                 SCK  52  //pin 52
-//MISO 12  //pin 12                                 MISO 50  //pin 50
-//MOSI 11  //pin 11                                 MOSI 51  //pin 51
-//CE    9                                           CE    9  
-//CSN  10                                           CSN  10  
-
-
-#include <SPI.h>      //Esta biblioteca le permite comunicarse con dispositivos SPI
-#include <nRF24L01.h> //Se incluye libreria 
-#include <RF24.h>     //Se incluye libreria
-
-#define boton1 A0     //Declaramos que la variable botón esté vinculada con el pin A0
-#define boton2 A1     //Declaramos que la variable botón esté vinculada con el pin A1
-#define boton3 A4     //Declaramos que la variable botón esté vinculada con el pin A4
-#define boton4 A5     //Declaramos que la variable botón esté vinculada con el pin A5
-#define boton5 A3     //Declaramos que la variable botón esté vinculada con el pin A3
-
-int Estado1 = 0;      //Creamos una variable que tendra un valor de 0
-int Estado2 = 0;      //Creamos una variable que tendrá un valor de 0
-int Estado3 = 0;      //Creamos una variable que tendrá un valor de 0
-int Estado4 = 0;      //Creamos una variable que tendrá un valor de 0
-int Estado5 = 0;      //Creamos una variable que tendrá un valor de 0
-
-RF24 radio(9, 10);    // CE, CSN
-
-const byte Direccion[6] = "00002"; // Canal 2
-
-void setup() {
+#include <RHReliableDatagram.h>
+#include <RH_NRF24.h>
+#include <SPI.h>
+ 
+#define joyVert    A0 
+#define joyHorz    A1
+ 
+//Posicion media
+int joyposVert = 512;
+int joyposHorz = 512;
+ 
+// Definir direcciones para canales de radio adrees 1 y 2 son de la libreria radiohead
+#define CLIENT_ADDRESS 1   
+#define SERVER_ADDRESS 2
+ 
+// Crear una instancia del controlador de radio
+RH_NRF24 RadioDriver;
+ 
+// Establece el controlador de radio en NRF24 y la dirección del cliente en 1
+RHReliableDatagram RadioManager(RadioDriver, CLIENT_ADDRESS);
+ 
+// Declarar matriz de control de motor de 8 bits sin firmar
+// 2 bytes para velocidades de motor más 1 byte para control de dirección
+uint8_t motorcontrol[3]; 
+ 
+// Definir el búfer de mensajes
+uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
+ 
+void setup()
+{
   
-  Serial.begin(9600);  //Inicializa el monitor serial
-  radio.begin();       //Inicializa el NRF24L01
-  radio.openWritingPipe(Direccion); ////Abrimos un canal de escritura
-  radio.setPALevel(RF24_PA_MIN);    //Establecemos el nivel del amplificador de potencia, en este caso Minimo
-  radio.stopListening();            //radio.stopListening() que configura el módulo como transmisor
-                                    //radio.startListening() que configura el módulo como receptor
-
+  Serial.begin(9600);
+ 
+  // Inicialice RadioManager con los valores predeterminados: 2,402 GHz (canal 2), 2Mbps, 0dBm
+  if (!RadioManager.init())
+    Serial.println("init failed");
   
-  pinMode(boton1,INPUT_PULLUP);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-  pinMode(boton2,INPUT_PULLUP);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-  pinMode(boton3,INPUT_PULLUP);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-  pinMode(boton4,INPUT_PULLUP);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-  pinMode(boton5,INPUT_PULLUP);//Declaramos el botón como entrada añadiendo una resistencia interna en Pull Up
-
+  // puse la dirección inicial del motor como hacia adelante
+  motorcontrol[2] = 0; //[matriz]
+ 
 }
-void loop() { //Inicia El blucle infinito "Lo que se encuentre en ese blucle se repetira infinitamente"
-
-  Estado1 = digitalRead(boton1); //Indicamos que la variable "Estado1"Sea igual a la lectura del "boton1"
-  Estado2 = digitalRead(boton2); //Indicamos que la variable "Estado2"Sea igual a la lectura del "boton2"
-  Estado3 = digitalRead(boton3); //Indicamos que la variable "Estado3"Sea igual a la lectura del "boton3"
-  Estado4 = digitalRead(boton4); //Indicamos que la variable "Estado4"Sea igual a la lectura del "boton4"
-  Estado5 = digitalRead(boton5); //Indicamos que la variable "Estado5"Sea igual a la lectura del "boton5"
+ 
+void loop()
+{
+  // Imprimir a monitor serial como Osvaldo ver si manda mensaje
+  Serial.println("Lectura de valores de control del motor ");
   
-  //Retro
-  if (Estado1 == HIGH){       //Si el pulso es alto "HIGH" o 1 se envía
-    Estado1 = 1;              //un 1
+  // Lee las posiciones del Joystick X & Y
+  joyposVert = analogRead(joyVert); 
+  joyposHorz = analogRead(joyHorz);
+ 
+  // INTENTAMOS Determinar si se trata de un movimiento hacia adelante o hacia atrás repito intentamos 
+// leyendo el valor vertical 
+// Aplique los resultados a MotorSpeed y a Direction
+ 
+  if (joyposVert < 460)
+  {
+    // Esto es al revés
+     // Establecer motores hacia atrás
+    motorcontrol[2] = 1;
+ 
+    //Determinar las velocidades del motor
+     // Como vamos hacia atrás, necesitamos revertir las lecturas
+    motorcontrol[0] = map(joyposVert, 460, 0, 0, 255);
+    motorcontrol[1] = map(joyposVert, 460, 0, 0, 255);
+ 
   }
-  else{                       //Si el pulso es bajo "LOW" o 0 se envía
-    Estado1 = 0;              //un 0
+  else if (joyposVert > 564)
+  {
+    // Esto es Adelante
+     // Poner Motores adelante
+    motorcontrol[2] = 0;
+ 
+    //AQUI DEBEMOS Determinar las velocidades del motor
+    motorcontrol[0] = map(joyposVert, 564, 1023, 0, 255);
+    motorcontrol[1] = map(joyposVert, 564, 1023, 0, 255); 
+ 
+  }
+  else
+  {
+    //PARADO (DETENIDO)
+    motorcontrol[0] = 0;
+    motorcontrol[1] = 0;
+    motorcontrol[2] = 0; 
+ 
   }
   
-  //Avanza
-  if (Estado2 == HIGH){       //Si el pulso es alto "HIGH" o 1 se envía
-    Estado2 = 3;              //un 3
+  //la dirección
+   // La posición Horizontal "pesará" la velocidad del motor
+   // Valores para cada motor
+ 
+  if (joyposHorz < 460)
+  {
+    // Mover hacia la izquierda
+     // Como vamos hacia la izquierda, necesitamos invertir las lecturas
+     // Asigne el número a un valor de 255 como máximo
+    joyposHorz = map(joyposHorz, 460, 0, 0, 255);
+ 
+    motorcontrol[0] = motorcontrol[0] - joyposHorz;
+    motorcontrol[1] = motorcontrol[1] + joyposHorz;
+ 
+    // No pasarnos del rango de 0-255 para las velocidades de motor
+    if (motorcontrol[0] < 0)motorcontrol[0] = 0;
+    if (motorcontrol[1] > 255)motorcontrol[1] = 255;
+ 
   }
-  else{                       //Si el pulso es bajo "LOW" o 0 se envía
-    Estado2 = 2;              //un 2
-  }
+  else if (joyposHorz > 564)
+  {
+    // Mover a la derecha
+     // Asigne el número a un valor de 255 como máximo
+    joyposHorz = map(joyposHorz, 564, 1023, 0, 255);
   
-  //Izquierda
-  if (Estado3 == HIGH){       //Si el pulso es alto "HIGH" o 1 se envía
-    Estado3 = 4;              //un 4
-  } 
-  else{                       //Si el pulso es bajo "LOW" o 0 se envía
-    Estado3 = 5;              //un 5
+    motorcontrol[0] = motorcontrol[0] + joyposHorz;
+    motorcontrol[1] = motorcontrol[1] - joyposHorz;
+ 
+    // No exceda el rango de 0-255 para velocidades de motor
+    if (motorcontrol[0] > 255)motorcontrol[0] = 255;
+    if (motorcontrol[1] < 0)motorcontrol[1] = 0;      
+ 
   }
+ 
+  // Ajuste para evitar "buzzing" a muy baja velocidad 
+  if (motorcontrol[0] < 8)motorcontrol[0] = 0;
+  if (motorcontrol[1] < 8)motorcontrol[1] = 0;
+ 
+  //Mostrar los valores de control del motor en el monitor serie (No estoy seguro si es como le hizo osvaldo para ver si mandaba señal si esta mal la corrigen por favor 🙂
+  Serial.print("Motor A: ");
+  Serial.print(motorcontrol[0]);
+  Serial.print(" - Motor B: ");
+  Serial.print(motorcontrol[1]);
+  Serial.print(" - Dirección: ");
+  Serial.println(motorcontrol[2]);
   
-  //Derecha
-    if (Estado4 == HIGH){     //Si el pulso es alto "HIGH" o 1 se envía
-    Estado4 = 6;              //un 6
+  //Enviar un mensaje que contenga datos de control del motor a manager_server
+  if (RadioManager.sendtoWait(motorcontrol, sizeof(motorcontrol), SERVER_ADDRESS))
+  {
+    // si sale bien esperamos una señal (respuesta)
+    uint8_t len = sizeof(buf); //sizeof = Para reservar memoria se debe saber exactamente el número de bytes que ocupa cualquier estructura de datos
+    uint8_t from;
+    if (RadioManager.recvfromAckTimeout(buf, &len, 2000, &from))
+    {
+      Serial.print("obtuve respuesta de : 0x");
+      Serial.print(from, HEX);
+      Serial.print(": ");
+      Serial.println((char*)buf);
+    }
+    else
+    {
+      Serial.println("No hay respuesta, ¿se está ejecutando nrf24_reliable_datagram_server?");
+    }
   }
-  else{                       //Si el pulso es bajo "LOW" o 0 se envía
-    Estado4 = 7;              //un 7
-  }
-    //360°
-    if (Estado5 == HIGH){     //Si el pulso es alto "HIGH" o 1 se envía
-    Estado5 = 8;              //un 8
-  }
-  else{                       //Si el pulso es bajo "LOW" o 0 se envía
-    Estado5 = 9;              //un 9
-  }
-  
-//  Serial.print(Estado1);   //Imprimimos en la terminal el valor almacenado en el "Estado1"
-//  Serial.print("\t");      //Imprimimos un espacio horizontal
-//  Serial.print(Estado2);   //Imprimimos en la terminal el valor almacenado en el "Estado2"
-//  Serial.print("\t");      //Imprimimos tabulación horizontal
-//  Serial.print(Estado3);   //Imprimimos en la terminal el valor almacenado en el "Estado3"
-//  Serial.print("\t");      //Imprimimos tabulación horizontal
-//  Serial.print(Estado4);   //Imprimimos en la terminal el valor almacenado en el "Estado4"
-//  Serial.print("\t");      //Imprimimos tabulación horizontal
-//  Serial.println(Estado5); //Imprimimos en la terminal el valor almacenado en el "Estado5"
-
-  radio.write(&Estado1, sizeof(Estado1)); //Enviaremos un mensaje al receptor. El primer argumento aquí es la variable que queremos que se envíe.
-  radio.write(&Estado2, sizeof(Estado2)); //Enviaremos un mensaje al receptor. El primer argumento aquí es la variable que queremos que se envíe.
-  radio.write(&Estado3, sizeof(Estado3)); //Enviaremos un mensaje al receptor. El primer argumento aquí es la variable que queremos que se envíe.
-  radio.write(&Estado4, sizeof(Estado4)); //Enviaremos un mensaje al receptor. El primer argumento aquí es la variable que queremos que se envíe.
-  radio.write(&Estado5, sizeof(Estado5)); //Enviaremos un mensaje al receptor. El primer argumento aquí es la variable que queremos que se envíe.
+  else
+    Serial.println("enviar a esperar falló");
+ 
+  delay(100);  
 }
