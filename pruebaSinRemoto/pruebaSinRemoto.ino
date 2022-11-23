@@ -49,15 +49,19 @@ void loop(){
 int botonPresionado(){
 
   if(digitalRead(boton1) == HIGH){
+    Serial.println(digitalRead(boton1));
     return 1;
   }
   else if(digitalRead(boton2) == HIGH){
+    Serial.println(digitalRead(boton2));
     return 2;
   }
   else if(digitalRead(boton3) == HIGH){
+    Serial.println(digitalRead(boton3));
     return 3;
   }
   else if(digitalRead(boton4) == HIGH){
+    Serial.println(digitalRead(boton4));
     return 4;
   }
 
